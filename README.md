@@ -10,5 +10,5 @@
 To build and run **netrun**, you need:
 
 1.  **C Compiler:** `gcc` or `clang` (C99/C11 support required).
-2.  **GPU Hardware:** Graphics card with support for OpenGL 3.3+.
+2.  **GPU Hardware:** Graphics card.
 3.  **Internet Access:** (Planned for future releases).
