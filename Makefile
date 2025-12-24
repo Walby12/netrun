@@ -1,4 +1,14 @@
-all: main
+CLAFGS = -Wall -Wextra -O2 -Isrc/include
+TARGET = netrun
+SRC = src/*.c
 
-main: src/*.c src/*.h
-	cc -o netrun -O2 -Wall -Wextra src/*.c
+all: $(TARGET)
+
+setup:
+	mkdir bin
+
+clean:
+	rm -rf bin/
+
+$(TARGET): $(SRC)
+	cc -o bin/$(TARGET) $(SRC) $(CLAFGS)
