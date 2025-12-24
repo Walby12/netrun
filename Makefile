@@ -1,4 +1,6 @@
-all: main
+CC = clang++
+CFLAGS = -Isrc/include -Wall -Wextra -O3
+LIBS = -lglfw -lGL -lX11 -lpthread -lXrandr -lXi -ldl -lm
 
-main:
-	gcc src/main.c -o netrun -lraylib -lGL -lm -lpthread -ldl -lrt -lX11 -Wall -Wextra -O3 
+netrun: src/main.cpp src/glad.c
+	$(CC) $(CFLAGS) src/main.cpp src/glad.c -o netrun $(LIBS)
