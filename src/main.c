@@ -1,67 +1,173 @@
 #include <stdio.h>
-#include "color.h"
-#include "include/ray.h"
-#include "include/vec3.h"
-#include "vec3.h"
-#include "ray.h"
+#include <math.h>
+#include "raylib.h"
 
-bool hit_sphere(const point3 center, double radius, const ray r) {
-    vec3 oc = vec3_sub(center, ray_origin(r));
-    double a = vec3_dot(ray_direction(r), ray_direction(r));
-    double b = -2.0 * vec3_dot(ray_direction(r), oc);
-    double c = vec3_dot(oc, oc) - radius * radius;
-    double delta  = b*b - 4*a*c;
-    return delta >= 0;
+#define P2 PI / 2
+#define P3 3 * PI / 2
+#define DR 0.0174533
+
+#define WINDOW_WIDTH 1024
+#define WINDOW_HEIGHT 512
+
+int map_x = 8;
+int map_y = 8;
+int map_s = 64;
+
+int map[] = {
+    1, 1, 1, 1, 1, 1, 1, 1,
+    1, 0, 0, 0, 0, 0, 0, 1,
+    1, 0, 0, 0, 0, 1, 0, 1,
+    1, 0, 1, 0, 0, 0, 0, 1,
+    1, 0, 1, 0, 0, 0, 0, 1,
+    1, 0, 0, 1, 0, 0, 0, 1,
+    1, 0, 0, 0, 0, 0, 0, 1,
+    1, 1, 1, 1, 1, 1, 1, 1,
+};
+
+float player_angle = 0;
+float player_x = 300;
+float player_y = 300;
+float player_delta_x = 0;
+float player_delta_y = 0;
+
+float dist(float ax, float ay, float bx, float by) {
+    return sqrt((bx - ax) * (bx - ax) + (by - ay) * (by - ay));
 }
 
-color ray_color(const ray r) {
-    point3 temp_p3 = { {0,0,-1} };
-    if (hit_sphere(temp_p3, 0.5, r)) {
-        color ret = { {1, 0, 0} };
-        return ret;
+void update_player() {
+    if (IsKeyDown(KEY_A)) {
+        player_angle -= 0.05f;
+        if (player_angle < 0) player_angle += 2 * PI;
+        player_delta_x = cos(player_angle) * 3;
+        player_delta_y = sin(player_angle) * 3;
     }
+    if (IsKeyDown(KEY_D)) {
+        player_angle += 0.05f;
+        if (player_angle > 2 * PI) player_angle -= 2 * PI;
+        player_delta_x = cos(player_angle) * 3;
+        player_delta_y = sin(player_angle) * 3;
+    }
+    if (IsKeyDown(KEY_W)) {
+        player_x += player_delta_x;
+        player_y += player_delta_y;
+    }
+    if (IsKeyDown(KEY_S)) {
+        player_x -= player_delta_x;
+        player_y -= player_delta_y;
+    }
+}
 
-    vec3 unit_direction = vec3_unit_vector(ray_direction(r));
-    double a = 0.5 * vec3_y(unit_direction) + 1.0;
-    color temp1 = { {1.0, 1.0, 1.0} };
-    color temp2 = { {0.5, 0.7, 1.0} };
-    return vec3_add(vec3_mul_scalar(temp1, (1.0-a)), vec3_mul_scalar(temp2, a));
+void draw_rays_3d() {
+    int mx, my, mp, dof;
+    float rx, ry, ra, xo, yo, dis_t;
+
+    ra = player_angle - DR * 30;
+    if (ra < 0) ra += 2 * PI;
+    if (ra > 2 * PI) ra -= 2 * PI;
+
+    for (int r = 0; r < 60; r++) {
+        dof = 0;
+        float dis_h = 1000000;
+        float hx = player_x, hy = player_y;
+        float a_tan = -1 / tan(ra);
+
+        if (ra > PI) {
+            ry = (((int)player_y >> 6) << 6) - 0.0001;
+            rx = (player_y - ry) * a_tan + player_x;
+            yo = -64; xo = -yo * a_tan;
+        } else if (ra < PI) {
+            ry = (((int)player_y >> 6) << 6) + 64;
+            rx = (player_y - ry) * a_tan + player_x;
+            yo = 64; xo = -yo * a_tan;
+        } else {
+            rx = player_x; ry = player_y; dof = 8;
+        }
+
+        while (dof < 8) {
+            mx = (int)(rx) >> 6; my = (int)(ry) >> 6; mp = my * map_x + mx;
+            if (mp >= 0 && mp < map_x * map_y && map[mp] == 1) {
+                hx = rx; hy = ry; dis_h = dist(player_x, player_y, hx, hy);
+                dof = 8;
+            } else {
+                rx += xo; ry += yo; dof += 1;
+            }
+        }
+
+        dof = 0;
+        float dis_v = 1000000;
+        float vx = player_x, vy = player_y;
+        float n_tan = -tan(ra);
+
+        if (ra > P2 && ra < P3) { 
+            rx = (((int)player_x >> 6) << 6) - 0.0001;
+            ry = (player_x - rx) * n_tan + player_y;
+            xo = -64; yo = -xo * n_tan;
+        } else if (ra < P2 || ra > P3) {
+            rx = (((int)player_x >> 6) << 6) + 64;
+            ry = (player_x - rx) * n_tan + player_y;
+            xo = 64; yo = -xo * n_tan;
+        } else { 
+            rx = player_x; ry = player_y; dof = 8;
+        }
+
+        while (dof < 8) {
+            mx = (int)(rx) >> 6; my = (int)(ry) >> 6; mp = my * map_x + mx;
+            if (mp >= 0 && mp < map_x * map_y && map[mp] == 1) {
+                vx = rx; vy = ry; dis_v = dist(player_x, player_y, vx, vy);
+                dof = 8;
+            } else {
+                rx += xo; ry += yo; dof += 1;
+            }
+        }
+
+        Color wallColor = GREEN;
+        if (dis_v < dis_h) {
+            dis_t = dis_v;
+            wallColor = ColorBrightness(GREEN, -0.2f);
+        } else {
+            dis_t = dis_h;
+        }
+
+        float ca = player_angle - ra;
+        if (ca < 0) ca += 2 * PI;
+        if (ca > 2 * PI) ca -= 2 * PI;
+        dis_t = dis_t * cos(ca);
+
+        float line_h = (map_s * WINDOW_HEIGHT) / dis_t;
+        if (line_h > WINDOW_HEIGHT) line_h = WINDOW_HEIGHT;
+        float line_o = (WINDOW_HEIGHT / 2) - (line_h / 2);
+
+        int strip_w = WINDOW_WIDTH / 60;
+        DrawRectangle(r * strip_w, line_o, strip_w, line_h, wallColor);
+
+        ra += DR;
+        if (ra < 0) ra += 2 * PI;
+        if (ra > 2 * PI) ra -= 2 * PI;
+    }
 }
 
 int main() {
-    double aspect_ratio = 16.0 / 9.0;
+    InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Netrun 3D");
+    SetTargetFPS(120);
 
-    int img_width = 400;
-    int img_height = (int) img_width / aspect_ratio;
-    img_height = (img_height < 1) ? 1 : img_height;
-    
-    double focal_lenght = 1.0;
-    double viewport_height = 2.0;
-    double viewport_width = viewport_height * ((double) img_width / img_height);
-    point3 camera_center = { {0,0,0} };
+    player_delta_x = cos(player_angle) * 3;
+    player_delta_y = sin(player_angle) * 3;
 
-    vec3 viewport_u = { {viewport_width, 0, 0} }; 
-    vec3 viewport_v = { {0, -viewport_height, 0} };
+    while (!WindowShouldClose()) {
+        update_player();
 
-    vec3 pixel_delta_u = vec3_div_scalar(viewport_u, img_width);
-    vec3 pixel_delta_v = vec3_div_scalar(viewport_v, img_height);
+        BeginDrawing();
+        ClearBackground(BLACK);
 
-    vec3 temp = { {0, 0, focal_lenght} };
-    vec3 viewport_upper_left = vec3_sub(vec3_sub(vec3_sub(camera_center, temp), vec3_div_scalar(viewport_u, 2)), vec3_div_scalar(viewport_v, 2)); 
-    vec3 pixel00_loc = vec3_add(viewport_upper_left, vec3_mul_scalar(vec3_add(pixel_delta_u, pixel_delta_v), 0.5));
+        DrawRectangle(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT / 2, DARKGRAY);
+        DrawRectangle(0, WINDOW_HEIGHT / 2, WINDOW_WIDTH, WINDOW_HEIGHT / 2, BLACK);
 
-    printf("P3\n%d %d\n255\n", img_width, img_height);
+        draw_rays_3d();
 
-    for (int j = 0; j < img_height; j++) {
-        for (int i = 0; i < img_width; i++) {
-            vec3 pixel_center = vec3_add(vec3_add(pixel00_loc, vec3_mul_scalar(pixel_delta_u, i)), vec3_mul_scalar(pixel_delta_v, j));
-            vec3 ray_dir = vec3_sub(pixel_center, camera_center);
-            ray r = {camera_center, ray_dir};
-
-            color pixel_color = ray_color(r);
-            write_color(pixel_color);
-        }
+        DrawFPS(10, 10);
+        EndDrawing();
     }
 
+    CloseWindow();
     return 0;
 }
